@@ -1,0 +1,685 @@
+<meta charset="utf-8">
+<title>Connect Zero</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: board on the left as the hero, a narrow "engine room" column on the right
+   (outlook headline, live confidence chart, controls); stacks to one column on phones. */
+/* single light theme on a white page, by request */
+:root {
+  color-scheme: light;
+  --paper: #ffffff;
+  --panel: #f6f7fa;
+  --ink: #131a30;
+  --muted: #5a6382;
+  --line: #d3d8e6;
+  --board: #2338a0;
+  --board-edge: #182a80;
+  --hole: #dfe4ef;
+  --gold: #f2b01e;
+  --gold-deep: #c98a00;
+  --rose: #e0455a;
+  --rose-deep: #b02a40;
+  --good: #1f8a5b;
+  --bad: #c43d4f;
+  --focus: #3b5bff;
+  --accent: #2338a0;
+  --display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+* { box-sizing: border-box; }
+html, body { background: var(--paper); color: var(--ink); }
+body { font-family: var(--body); font-size: 15px; line-height: 1.5; }
+.wrap {
+  max-width: 1120px; margin: 0 auto;
+  padding-block: 28px 40px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: grid; gap: 22px;
+}
+header { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px 24px; }
+h1 { font-family: var(--display); font-weight: 800; font-size: clamp(30px, 5vw, 46px); letter-spacing: -0.02em; line-height: 1; margin: 0; }
+h1 span { color: var(--accent); }
+.tag { color: var(--muted); max-width: 52ch; margin: 0; }
+.main { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 28px; align-items: start; }
+@media (max-width: 860px) { .main { grid-template-columns: minmax(0, 1fr); } }
+
+/* ---------- board ---------- */
+.stage { display: grid; gap: 10px; min-width: 0; }
+.board {
+  position: relative; width: 100%; max-width: 620px; aspect-ratio: 7 / 6.35;
+  background: var(--board); border-radius: 18px; padding: 2.2% 2.2% 4.5%;
+  box-shadow: inset 0 -10px 0 var(--board-edge), 0 18px 40px -22px rgba(19, 26, 48, .55);
+  display: grid; grid-template-columns: repeat(7, 1fr); gap: 0;
+  touch-action: manipulation; user-select: none;
+}
+.col { position: relative; display: grid; grid-template-rows: repeat(6, 1fr); cursor: pointer; border-radius: 10px; outline: none; }
+.col:focus-visible { box-shadow: 0 0 0 3px var(--focus); }
+.board.locked .col { cursor: default; }
+.col:not(.full):hover::before, .col:focus-visible::before {
+  content: ""; position: absolute; inset: 0; border-radius: 12px; background: rgba(255, 255, 255, .08);
+}
+.board.locked .col::before { display: none; }
+.cell { position: relative; display: grid; place-items: center; }
+.hole { width: 82%; aspect-ratio: 1; border-radius: 50%; background: var(--hole); box-shadow: inset 0 4px 6px rgba(0, 0, 0, .28); position: relative; overflow: visible; }
+.disc {
+  position: absolute; inset: 0; border-radius: 50%;
+  box-shadow: inset 0 -5px 0 rgba(0, 0, 0, .18), inset 0 3px 0 rgba(255, 255, 255, .35);
+}
+.disc.p1 { background: var(--gold); }
+.disc.p2 { background: var(--rose); }
+.disc.drop { animation: drop var(--dur, 380ms) cubic-bezier(.35, 0, .6, 1.25); }
+@keyframes drop { from { transform: translateY(var(--from, -600%)); } to { transform: translateY(0); } }
+.disc.win { outline: 4px solid var(--ink); outline-offset: 3px; }
+.disc.last::after { content: ""; position: absolute; inset: 38%; border-radius: 50%; background: rgba(255, 255, 255, .55); }
+.ghost { position: absolute; inset: 0; border-radius: 50%; opacity: .35; }
+@media (prefers-reduced-motion: reduce) { .disc.drop { animation: none; } }
+
+/* per-column analysis strip, aligned with the board */
+.strip { width: 100%; max-width: 620px; display: grid; grid-template-columns: repeat(7, 1fr); padding: 0 2.2%; gap: 0; }
+.sc { display: grid; justify-items: center; gap: 3px; font-family: var(--mono); font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.bar { width: 60%; height: 46px; background: var(--line); border-radius: 6px; position: relative; overflow: hidden; }
+.bar i { position: absolute; left: 0; right: 0; bottom: 0; background: var(--board); border-radius: 6px 6px 0 0; transition: height .15s; }
+.sc.best .bar i { background: var(--good); }
+.sc b { font-weight: 500; color: var(--ink); }
+.strip-legend { max-width: 620px; font-size: 12.5px; color: var(--muted); margin: 0; }
+.strip[hidden], .strip-legend[hidden] { display: none; }
+
+/* ---------- engine room ---------- */
+.room { display: grid; gap: 18px; min-width: 0; }
+.card { background: var(--panel); border: 0; border-radius: 14px; padding: 16px 18px; display: grid; gap: 12px; min-width: 0; }
+.eyebrow { font-family: var(--mono); font-size: 11.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 0; }
+.status { font-family: var(--display); font-weight: 700; font-size: clamp(20px, 2.6vw, 26px); line-height: 1.15; margin: 0; text-wrap: balance; }
+.who { display: flex; gap: 14px; flex-wrap: wrap; font-size: 13.5px; color: var(--muted); }
+.who span { display: inline-flex; align-items: center; gap: 6px; }
+.dot { width: 13px; height: 13px; border-radius: 50%; display: inline-block; }
+.dot.p1 { background: var(--gold); } .dot.p2 { background: var(--rose); }
+.meter { display: grid; gap: 6px; }
+.meter-track { height: 12px; border-radius: 99px; background: linear-gradient(90deg, var(--you-color, var(--gold)) 0 50%, var(--ai-color, var(--rose)) 50% 100%); position: relative; opacity: .9; }
+.meter-track .needle { position: absolute; top: -5px; width: 4px; height: 22px; border-radius: 2px; background: var(--ink); transform: translateX(-50%); transition: left .25s; }
+.meter-labels { display: flex; justify-content: space-between; font-size: 12.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.meter-labels b { color: var(--ink); font-weight: 600; }
+.think { height: 3px; background: var(--line); border-radius: 2px; overflow: hidden; }
+.think i { display: block; height: 100%; width: 0; background: var(--board); }
+.chart svg { width: 100%; height: auto; display: block; }
+.chart text { font-family: var(--mono); font-size: 10px; fill: var(--muted); }
+.controls { display: grid; gap: 10px; }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+button, select {
+  font: inherit; font-size: 14px; border-radius: 10px; border: 1px solid var(--line);
+  background: var(--paper); color: var(--ink); padding: 8px 12px; cursor: pointer;
+}
+button:hover:not(:disabled), select:hover { border-color: var(--muted); }
+button:focus-visible, select:focus-visible { outline: 3px solid var(--focus); outline-offset: 1px; }
+button:disabled { opacity: .45; cursor: default; }
+button.primary { background: var(--board); color: #fff; border-color: var(--board); font-weight: 600; }
+label.inline { display: inline-flex; align-items: center; gap: 8px; font-size: 13.5px; color: var(--muted); }
+.moves { font-family: var(--mono); font-size: 12.5px; color: var(--muted); word-break: break-all; margin: 0; }
+.facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.fact { display: grid; gap: 2px; }
+.fact b { font-family: var(--display); font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.fact span { font-size: 12px; color: var(--muted); line-height: 1.3; }
+@media (max-width: 420px) { .facts { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.err { color: var(--bad); }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Connect <span>Zero</span></h1>
+  </header>
+
+  <div class="main">
+    <section class="stage" aria-label="Game board">
+      <div class="board" id="board" role="grid" aria-label="Connect Four board, 7 columns"></div>
+      <div class="strip" id="strip" aria-label="AI analysis per column"></div>
+    </section>
+
+    <aside class="room">
+      <div class="card">
+        <p class="eyebrow" id="turnLabel">Your move</p>
+        <p class="status" id="status">Loading the network…</p>
+        <div class="who"><span><i class="dot p1"></i><span id="p1name">You</span> (first)</span><span><i class="dot p2"></i><span id="p2name">AI</span> (second)</span></div>
+        <div class="meter" aria-live="polite">
+          <div class="meter-track" id="meterTrack"><span class="needle" id="needle" style="left:50%"></span></div>
+          <div class="meter-labels"><span><b id="youPct">–</b> you</span><span>draw</span><span>AI <b id="aiPct">–</b></span></div>
+        </div>
+        <div class="think" id="think" aria-hidden="true" hidden><i id="thinkBar"></i></div>
+      </div>
+
+      <div class="card chart">
+        <p class="eyebrow">AI win confidence, move by move</p>
+        <div id="chart"></div>
+      </div>
+
+      <div class="card controls">
+        <div class="row">
+          <button class="primary" id="newYou">New game, you start</button>
+          <button id="newAi">New game, AI starts</button>
+        </div>
+        <div class="row">
+          <button id="hint">Hint</button>
+          <button id="undo">Undo</button>
+          <label class="inline" for="strength">Thinking
+            <select id="strength">
+              <option value="400">Quick (0.4 s)</option>
+              <option value="1500" selected>Standard (1.5 s)</option>
+              <option value="5000">Deep (5 s)</option>
+            </select>
+          </label>
+          <label class="inline" for="engineSel">Engine
+            <select id="engineSel">
+              <option value="guard" selected>Zero + Proof (unbeatable)</option>
+              <option value="pure">Zero only (pure self-play)</option>
+            </select>
+          </label>
+          <label class="inline" for="showStrip"><input type="checkbox" id="showStrip" checked> Show analysis</label>
+        </div>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<script src="model.js"></script>
+<script src="proof.js"></script>
+<script id="engine" type="text/plain">
+// ---------- Connect Four engine + network + MCTS (runs in a Web Worker) ----------
+const W = 7, H = 6;
+function newBoard() { return { cells: new Int8Array(42), heights: new Int8Array(7), moves: 0 }; }
+function copyBoard(b) { return { cells: b.cells.slice(), heights: b.heights.slice(), moves: b.moves }; }
+function legal(b) { const m = []; for (let c = 0; c < W; c++) if (b.heights[c] < H) m.push(c); return m; }
+function toMove(b) { return (b.moves & 1) ? 2 : 1; }
+function fourAt(cells, r, c, p) {
+  const dirs = [[0, 1], [1, 0], [1, 1], [1, -1]];
+  for (const [dr, dc] of dirs) {
+    let n = 1;
+    for (let k = 1; k < 4; k++) { const rr = r + dr * k, cc = c + dc * k; if (rr < 0 || rr >= H || cc < 0 || cc >= W || cells[rr * W + cc] !== p) break; n++; }
+    for (let k = 1; k < 4; k++) { const rr = r - dr * k, cc = c - dc * k; if (rr < 0 || rr >= H || cc < 0 || cc >= W || cells[rr * W + cc] !== p) break; n++; }
+    if (n >= 4) return true;
+  }
+  return false;
+}
+function winsAt(b, r, c, p) { // would p win by owning empty cell (r,c)?
+  if (r >= H) return false;
+  const i = r * W + c; b.cells[i] = p; const w = fourAt(b.cells, r, c, p); b.cells[i] = 0; return w;
+}
+function play(b, c) { // returns true if the mover won
+  const r = b.heights[c], p = toMove(b);
+  b.cells[r * W + c] = p; b.heights[c]++; b.moves++;
+  return fourAt(b.cells, r, c, p);
+}
+function tactics(b) {
+  const me = toMove(b), opp = 3 - me, L = legal(b);
+  const wins = L.filter(c => winsAt(b, b.heights[c], c, me));
+  if (wins.length) return { moves: wins, proven: 1 };
+  const forced = L.filter(c => winsAt(b, b.heights[c], c, opp));
+  if (forced.length >= 2) return { moves: L, proven: -1 };
+  const poss = forced.length ? forced : L;
+  const safe = poss.filter(c => !winsAt(b, b.heights[c] + 1, c, opp));
+  if (!safe.length) return { moves: poss, proven: -1 };
+  return { moves: safe, proven: null };
+}
+
+// ---------- network ----------
+let NET = null;
+function initNet(model, data) {
+  const L = {};
+  for (const l of model.layers) {
+    const n = l.wshape.reduce((a, b) => a * b, 1);
+    L[l.name] = { w: data.subarray(l.w, l.w + n), b: data.subarray(l.b, l.b + l.wshape[0]), shape: l.wshape };
+  }
+  NET = { L, C: model.config.channels, B: model.config.blocks,
+          bufA: new Float32Array(model.config.channels * 42), bufB: new Float32Array(model.config.channels * 42), bufC: new Float32Array(model.config.channels * 42) };
+}
+let COLS = null; // im2col scratch: (cin*9) rows x 42 positions
+function conv3(inp, cin, layer, out, relu, resid) {
+  const cout = layer.shape[0], w = layer.w, bias = layer.b, K = cin * 9;
+  if (!COLS || COLS.length < K * 42) COLS = new Float32Array(K * 42);
+  const X = COLS;
+  for (let i = 0; i < cin; i++) {
+    for (let ky = 0; ky < 3; ky++) for (let kx = 0; kx < 3; kx++) {
+      const row = (i * 9 + ky * 3 + kx) * 42, dy = ky - 1, dx = kx - 1;
+      for (let r = 0; r < H; r++) {
+        const rr = r + dy;
+        for (let c = 0; c < W; c++) {
+          const cc = c + dx;
+          X[row + r * 7 + c] = (rr < 0 || rr >= H || cc < 0 || cc >= W) ? 0 : inp[i * 42 + rr * 7 + cc];
+        }
+      }
+    }
+  }
+  const a0 = new Float32Array(42), a1 = new Float32Array(42), a2 = new Float32Array(42), a3 = new Float32Array(42);
+  for (let o = 0; o < cout; o += 4) { // four output channels per pass over the columns
+    a0.fill(bias[o]); a1.fill(bias[o + 1]); a2.fill(bias[o + 2]); a3.fill(bias[o + 3]);
+    const w0 = o * K, w1 = w0 + K, w2 = w1 + K, w3 = w2 + K;
+    for (let j = 0; j < K; j++) {
+      const v0 = w[w0 + j], v1 = w[w1 + j], v2 = w[w2 + j], v3 = w[w3 + j], xr = j * 42;
+      for (let k = 0; k < 42; k++) {
+        const x = X[xr + k];
+        a0[k] += v0 * x; a1[k] += v1 * x; a2[k] += v2 * x; a3[k] += v3 * x;
+      }
+    }
+    const accs = [a0, a1, a2, a3];
+    for (let q = 0; q < 4; q++) {
+      const acc = accs[q], ob = (o + q) * 42;
+      if (resid) for (let k = 0; k < 42; k++) acc[k] += resid[ob + k];
+      if (relu) for (let k = 0; k < 42; k++) out[ob + k] = acc[k] > 0 ? acc[k] : 0;
+      else for (let k = 0; k < 42; k++) out[ob + k] = acc[k];
+    }
+  }
+}
+function conv1(inp, cin, layer) {
+  const cout = layer.shape[0], out = new Float32Array(cout * 42);
+  for (let o = 0; o < cout; o++) {
+    for (let k = 0; k < 42; k++) out[o * 42 + k] = layer.b[o];
+    for (let i = 0; i < cin; i++) { const wv = layer.w[o * cin + i]; for (let k = 0; k < 42; k++) out[o * 42 + k] += wv * inp[i * 42 + k]; }
+  }
+  for (let k = 0; k < out.length; k++) if (out[k] < 0) out[k] = 0;
+  return out;
+}
+function linear(inp, layer, relu) {
+  const [o, i] = layer.shape, out = new Float32Array(o);
+  for (let a = 0; a < o; a++) { let s = layer.b[a]; const wb = a * i; for (let k = 0; k < i; k++) s += layer.w[wb + k] * inp[k]; out[a] = relu && s < 0 ? 0 : s; }
+  return out;
+}
+let evals = 0;
+const CACHE = new Map(); // network outputs by position: transpositions and later turns reuse them
+function evaluate(b) {
+  const key = b.cells.join("");
+  const hit = CACHE.get(key);
+  if (hit) return hit;
+  const res = forward(b);
+  if (CACHE.size > 300000) CACHE.clear();
+  CACHE.set(key, res);
+  return res;
+}
+function forward(b) {
+  evals++;
+  const me = toMove(b), x = new Float32Array(3 * 42);
+  for (let k = 0; k < 42; k++) { const v = b.cells[k]; if (v === me) x[k] = 1; else if (v) x[42 + k] = 1; x[84 + k] = 1; }
+  const { L, C, B } = NET;
+  let cur = NET.bufA, tmp = NET.bufB, nxt = NET.bufC;
+  conv3(x, 3, L.stem, cur, true, null);
+  for (let i = 0; i < B; i++) {
+    conv3(cur, C, L["b" + i + "a"], tmp, true, null);
+    conv3(tmp, C, L["b" + i + "b"], nxt, true, cur);
+    const t = cur; cur = nxt; nxt = t;
+  }
+  const logits = linear(conv1(cur, C, L.p_conv), L.p_fc, false);
+  const h = linear(conv1(cur, C, L.v_conv), L.v_fc1, true);
+  const v = Math.tanh(linear(h, L.v_fc2, false)[0]);
+  return { logits, v };
+}
+
+// ---------- MCTS ----------
+const CPUCT = 2.0, FPU = 0.25;
+function makeNode() { return { moves: null, P: null, N: null, Wt: null, kids: null, n: 0, terminal: null, expanded: false }; }
+function prepare(node, b, lastWon) {
+  if (lastWon) { node.terminal = -1; return false; }
+  if (b.moves >= 42) { node.terminal = 0; return false; }
+  const t = tactics(b);
+  node.moves = t.moves;
+  if (t.proven !== null) { node.terminal = t.proven; return false; }
+  return true;
+}
+function expand(node, b) {
+  const { logits, v } = evaluate(b);
+  let mx = -1e9; for (const c of node.moves) mx = Math.max(mx, logits[c]);
+  const p = node.moves.map(c => Math.exp(logits[c] - mx)); const s = p.reduce((a, x) => a + x, 0);
+  node.P = p.map(x => x / s); node.N = new Array(p.length).fill(0); node.Wt = new Array(p.length).fill(0);
+  node.kids = new Array(p.length).fill(null); node.expanded = true;
+  return { v, logits };
+}
+function select(node) {
+  const sq = CPUCT * Math.sqrt(Math.max(node.n, 1));
+  let tot = 0; for (const w of node.Wt) tot += w;
+  const fpu = (node.n ? tot / node.n : 0) - FPU;
+  let best = -1e9, bi = 0;
+  for (let i = 0; i < node.N.length; i++) {
+    const n = node.N[i], u = (n ? node.Wt[i] / n : fpu) + node.P[i] * sq / (1 + n);
+    if (u > best) { best = u; bi = i; }
+  }
+  return bi;
+}
+function simulate(root, rootBoard) {
+  const b = copyBoard(rootBoard), path = [];
+  let node = root, v;
+  while (true) {
+    if (node.terminal !== null) { v = node.terminal; break; }
+    if (!node.expanded) { v = expand(node, b).v; break; }
+    const i = select(node); path.push([node, i]);
+    const won = play(b, node.moves[i]);
+    if (!node.kids[i]) {
+      const k = node.kids[i] = makeNode();
+      if (!prepare(k, b, won)) { v = k.terminal; break; }
+    }
+    node = node.kids[i];
+  }
+  for (let j = path.length - 1; j >= 0; j--) { v = -v; const [nd, i] = path[j]; nd.N[i]++; nd.Wt[i] += v; nd.n++; }
+}
+function report(root, rootBoard, net, done, sims, ms) {
+  const visits = new Array(7).fill(0), q = new Array(7).fill(null);
+  if (root.expanded) root.moves.forEach((c, i) => { visits[c] = root.N[i]; q[c] = root.N[i] ? root.Wt[i] / root.N[i] : null; });
+  let move = -1, best = -1;
+  if (root.expanded) root.moves.forEach((c, i) => { const s = root.N[i] + (q[c] ?? -2) * 1e-3; if (s > best) { best = s; move = c; } });
+  let value = move >= 0 && q[move] !== null ? q[move] : net.v;
+  return { visits, q, move, value, netValue: net.v, done, sims, ms };
+}
+// ---------- proofs: opening book + exact solver (WebAssembly) ----------
+let SOLVER = null, BOOK = {};
+const EMPTY_SCORES = [-1, -1, 0, 1, 0, -1, -1];
+function initSolver(bytes) {
+  try {
+    const mod = new WebAssembly.Module(bytes);
+    const inst = new WebAssembly.Instance(mod, {});
+    SOLVER = inst.exports;
+  } catch (e) { SOLVER = null; }
+}
+function canon(hist) {
+  const s = hist.map(c => c + 1).join(""), m = hist.map(c => 7 - c).join("");
+  return m < s ? [m, true] : [s, false];
+}
+function proof(hist, budget) { // -> {scores, book} or null
+  if (hist.length === 0) return { scores: EMPTY_SCORES.slice(), book: true };
+  const [k, mir] = canon(hist);
+  if (BOOK[k]) return { scores: mir ? BOOK[k].slice().reverse() : BOOK[k].slice(), book: true };
+  if (!SOLVER || budget <= 0) return null;
+  let cur = 0n, mask = 0n;
+  for (const c of hist) { cur ^= mask; mask |= mask + (1n << BigInt(c * 7)); }
+  const out = SOLVER.memory.buffer.byteLength - 64;
+  const ok = SOLVER.c4_analyze_budget(cur, mask, hist.length, 1, out, BigInt(budget));
+  if (!ok) return null;
+  const v = new Int32Array(SOLVER.memory.buffer, out, 7);
+  return { scores: Array.from(v, x => x === -1000 ? null : x), book: false };
+}
+function guardMove(res, hist, logits, budget) {
+  const pr = proof(hist, budget);
+  if (!pr) return res;
+  const sc = pr.scores; let best = -9;
+  for (const v of sc) if (v !== null && v > best) best = v;
+  const cands = sc.map((v, c) => v === best ? c : -1).filter(c => c >= 0);
+  let move = res.move;
+  if (pr.book) { move = cands[0]; for (const c of cands) if (logits[c] > logits[move]) move = c; }
+  else if (!cands.includes(move)) { move = cands[0]; for (const c of cands) if (res.visits[c] > res.visits[move]) move = c; }
+  return { ...res, overruled: move !== res.move ? res.move : null, move, value: best, proof: best, proofScores: sc };
+}
+function think(boardData, timeMs, maxSims, id, guard, budget) {
+  const b = { cells: Int8Array.from(boardData.cells), heights: Int8Array.from(boardData.heights), moves: boardData.moves };
+  const hist = boardData.history;
+  const t = tactics(b), net = evaluate(b);
+  const prior = new Array(7).fill(null);
+  { const L = legal(b); let mx = -1e9; for (const c of L) mx = Math.max(mx, net.logits[c]); let s = 0; for (const c of L) s += Math.exp(net.logits[c] - mx); for (const c of L) prior[c] = Math.exp(net.logits[c] - mx) / s; }
+  if (t.proven !== null || t.moves.length === 1) {
+    let move = t.moves[0]; for (const c of t.moves) if (prior[c] > prior[move]) move = c;
+    const visits = new Array(7).fill(0); visits[move] = 1; const q = new Array(7).fill(null);
+    const value = t.proven !== null ? t.proven : net.v; q[move] = value;
+    const res = { id, visits, q, move, value, netValue: net.v, prior, done: true, sims: 0, ms: 0, forced: t.proven === null ? "forced" : (t.proven > 0 ? "win" : "lost") };
+    if (t.proven !== null) res.proof = t.proven;
+    postMessage(res);
+    return;
+  }
+  const root = makeNode(); prepare(root, b, false);
+  const t0 = performance.now(); let sims = 0, lastPost = t0;
+  while (sims < maxSims) {
+    simulate(root, b); sims++;
+    const now = performance.now();
+    if (now - t0 >= timeMs) break;
+    if (now - lastPost > 120) { lastPost = now; postMessage({ id, ...report(root, b, net, false, sims, now - t0), prior }); }
+  }
+  let res = { id, ...report(root, b, net, true, sims, performance.now() - t0), prior };
+  if (guard) res = guardMove(res, hist, net.logits, budget);
+  postMessage(res);
+}
+if (typeof self !== "undefined" && typeof window === "undefined") {
+  self.onmessage = (e) => {
+    const m = e.data;
+    if (m.type === "init") { initNet(m.model, m.data); if (m.wasm) initSolver(m.wasm); BOOK = m.book || {}; postMessage({ ready: true, solver: !!SOLVER }); }
+    else if (m.type === "think") think(m.board, m.timeMs, m.maxSims, m.id, m.guard, m.budget);
+  };
+}
+</script>
+
+<script>
+(() => {
+  const W = 7, H = 6;
+  const $ = (id) => document.getElementById(id);
+  const boardEl = $("board"), stripEl = $("strip");
+  let worker = null, ready = false, thinkId = 0, pending = null, solverReady = false;
+  let state, history, humanPlayer, confidence, gameOver, winCells, busy, lastAnalysis;
+  const cellsEl = [];
+
+  // ---------- board DOM ----------
+  for (let c = 0; c < W; c++) {
+    const col = document.createElement("div");
+    col.className = "col"; col.tabIndex = 0; col.dataset.c = c;
+    col.setAttribute("role", "button"); col.setAttribute("aria-label", "Drop in column " + (c + 1));
+    for (let r = H - 1; r >= 0; r--) {
+      const cell = document.createElement("div"); cell.className = "cell";
+      const hole = document.createElement("div"); hole.className = "hole";
+      cell.appendChild(hole); col.appendChild(cell); cellsEl[r * W + c] = hole;
+    }
+    col.addEventListener("click", () => humanMove(c));
+    col.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); humanMove(c); } if (e.key === "ArrowRight") boardEl.children[Math.min(6, c + 1)].focus(); if (e.key === "ArrowLeft") boardEl.children[Math.max(0, c - 1)].focus(); });
+    boardEl.appendChild(col);
+    const sc = document.createElement("div"); sc.className = "sc";
+    sc.innerHTML = '<div class="bar"><i style="height:0"></i></div><b>–</b>';
+    stripEl.appendChild(sc);
+  }
+  document.addEventListener("keydown", (e) => { if (/^[1-7]$/.test(e.key) && document.activeElement.tagName !== "SELECT") humanMove(+e.key - 1); });
+
+  function newState() { return { cells: new Int8Array(42), heights: new Int8Array(7), moves: 0 }; }
+  function toMove(s) { return (s.moves & 1) ? 2 : 1; }
+  function fourLine(cells, r, c, p) {
+    for (const [dr, dc] of [[0, 1], [1, 0], [1, 1], [1, -1]]) {
+      const line = [[r, c]];
+      for (const s of [1, -1]) for (let k = 1; k < 4; k++) { const rr = r + dr * k * s, cc = c + dc * k * s; if (rr < 0 || rr >= H || cc < 0 || cc >= W || cells[rr * W + cc] !== p) break; line.push([rr, cc]); }
+      if (line.length >= 4) return line;
+    }
+    return null;
+  }
+
+  // ---------- rendering ----------
+  function render(animateLast) {
+    for (let r = 0; r < H; r++) for (let c = 0; c < W; c++) {
+      const hole = cellsEl[r * W + c], v = state.cells[r * W + c];
+      hole.innerHTML = "";
+      if (v) {
+        const d = document.createElement("div"); d.className = "disc p" + v;
+        const last = history.length && history[history.length - 1] === c && state.heights[c] - 1 === r;
+        if (last) { d.classList.add("last"); if (animateLast) { d.classList.add("drop"); d.style.setProperty("--from", -(H - r) * 122 + "%"); d.style.setProperty("--dur", 180 + (H - r) * 45 + "ms"); } }
+        if (winCells && winCells.some(([rr, cc]) => rr === r && cc === c)) d.classList.add("win");
+        hole.appendChild(d);
+      }
+    }
+    [...boardEl.children].forEach((col, c) => col.classList.toggle("full", state.heights[c] >= H));
+    const locked = gameOver || busy || toMove(state) !== humanPlayer || !ready;
+    boardEl.classList.toggle("locked", locked);
+    $("undo").disabled = busy || history.length === 0;
+    $("hint").disabled = locked;
+    $("p1name").textContent = humanPlayer === 1 ? "You" : "AI";
+    $("p2name").textContent = humanPlayer === 2 ? "You" : "AI";
+    const meter = $("meterTrack");
+    meter.style.setProperty("--you-color", humanPlayer === 1 ? "var(--gold)" : "var(--rose)");
+    meter.style.setProperty("--ai-color", humanPlayer === 1 ? "var(--rose)" : "var(--gold)");
+    drawChart();
+  }
+  function setStatus(eyebrow, text) { $("turnLabel").textContent = eyebrow; $("status").textContent = text; }
+  function setMeter(aiWin) { // aiWin in [-1,1] from the AI's side
+    if (aiWin === null || aiWin === undefined || isNaN(aiWin)) { $("youPct").textContent = "–"; $("aiPct").textContent = "–"; $("needle").style.left = "50%"; return; }
+    const ai = 50 * (aiWin + 1);
+    $("needle").style.left = ai * 0.98 + 1 + "%";
+    $("aiPct").textContent = Math.round(ai) + "%"; $("youPct").textContent = Math.round(100 - ai) + "%";
+  }
+  function setStrip(a) {
+    lastAnalysis = a;
+    const total = a ? a.visits.reduce((x, y) => x + y, 0) : 0;
+    [...stripEl.children].forEach((sc, c) => {
+      const bar = sc.querySelector("i"), lab = sc.querySelector("b");
+      if (!a || total === 0 || state.heights[c] >= H) { bar.style.height = "0"; lab.textContent = "–"; sc.classList.remove("best"); return; }
+      bar.style.height = (100 * a.visits[c] / total).toFixed(1) + "%";
+      if (a.proofScores && a.proofScores[c] !== null) lab.textContent = a.proofScores[c] > 0 ? "win" : a.proofScores[c] < 0 ? "loss" : "draw";
+      else lab.textContent = a.q[c] === null ? "·" : Math.round(50 * (a.q[c] + 1));
+      sc.classList.toggle("best", c === a.move);
+    });
+  }
+
+  // ---------- confidence chart ----------
+  function drawChart() {
+    const w = 420, h = 170, l = 34, r = 10, t = 10, b = 26;
+    const pts = confidence.map((v, i) => [i, v]).filter(p => p[1] !== null);
+    const maxX = Math.max(8, history.length);
+    const X = (i) => l + (w - l - r) * i / maxX, Y = (v) => t + (h - t - b) * (1 - (v + 1) / 2);
+    let s = `<svg viewBox="0 0 ${w} ${h}" role="img" aria-label="AI win confidence after each move">`;
+    for (const [v, lab] of [[1, "100%"], [0, "50%"], [-1, "0%"]]) {
+      if (v === 0) s += `<line x1="${l}" x2="${w - r}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--line)" stroke-width="1" stroke-dasharray="4 4"/>`;
+      s += `<text x="${l - 6}" y="${Y(v) + 3}" text-anchor="end">${lab}</text>`;
+    }
+    const step = maxX > 24 ? 10 : 4;
+    for (let i = 0; i <= maxX; i += step) s += `<text x="${X(i)}" y="${h - 8}" text-anchor="middle">${i}</text>`;
+    s += `<text x="${l + 4}" y="${Y(1) + 12}">AI winning</text><text x="${l + 4}" y="${Y(-1) - 5}">you winning</text>`;
+    if (pts.length) {
+      const d = pts.map((p, k) => (k ? "L" : "M") + X(p[0]).toFixed(1) + " " + Y(p[1]).toFixed(1)).join(" ");
+      const area = d + ` L${X(pts[pts.length - 1][0]).toFixed(1)} ${Y(0)} L${X(pts[0][0]).toFixed(1)} ${Y(0)} Z`;
+      s += `<path d="${area}" fill="var(--board)" fill-opacity="0.12"/>`;
+      s += `<path d="${d}" fill="none" stroke="var(--board)" stroke-width="2.2" stroke-linejoin="round"/>`;
+      const lp = pts[pts.length - 1];
+      s += `<circle cx="${X(lp[0])}" cy="${Y(lp[1])}" r="4.5" fill="var(--board)" stroke="var(--panel)" stroke-width="2"/>`;
+    }
+    s += "</svg>";
+    $("chart").innerHTML = s;
+  }
+
+  // ---------- worker ----------
+  function ask(timeMs, maxSims, onUpdate, budget) {
+    return new Promise((resolve) => {
+      const id = ++thinkId;
+      pending = { id, onUpdate, resolve };
+      const guard = $("engineSel").value === "guard" && solverReady;
+      worker.postMessage({ type: "think", id, timeMs, maxSims, guard, budget: budget || 0,
+        board: { cells: Array.from(state.cells), heights: Array.from(state.heights), moves: state.moves, history: history.slice() } });
+    });
+  }
+  function startWorker() {
+    const M = window.C4_MODEL;
+    if (!M) { setStatus("Error", "The network file (model.js) did not load."); $("status").classList.add("err"); return; }
+    const bin = atob(M.data), bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    const data = new Float32Array(bytes.buffer);
+    const src = $("engine").textContent;
+    worker = new Worker(URL.createObjectURL(new Blob([src], { type: "text/javascript" })));
+    worker.onmessage = (e) => {
+      const m = e.data;
+      if (m.ready) {
+        ready = true; solverReady = m.solver;
+        if (!solverReady) { const o = $("engineSel").options[0]; o.disabled = true; o.textContent = "Zero + Proof (unavailable here)"; $("engineSel").value = "pure"; }
+        newGame(1); return;
+      }
+      if (!pending || m.id !== pending.id) return;
+      if (pending.onUpdate) pending.onUpdate(m);
+      if (m.done) { const p = pending; pending = null; p.resolve(m); }
+    };
+    let wasm = null;
+    if (window.C4_SOLVER) { const w = atob(window.C4_SOLVER); wasm = new Uint8Array(w.length); for (let i = 0; i < w.length; i++) wasm[i] = w.charCodeAt(i); }
+    worker.postMessage({ type: "init", model: { layers: M.layers, config: M.config }, data, wasm, book: window.C4_BOOK || {} }, [data.buffer]);
+  }
+  function renderFacts(meta) {
+    const items = meta.facts || [];
+    $("facts").innerHTML = items.map(f => `<div class="fact"><b>${f.value}</b><span>${f.label}</span></div>`).join("");
+  }
+
+  // ---------- game flow ----------
+  function applyMove(c) {
+    const r = state.heights[c], p = toMove(state);
+    state.cells[r * W + c] = p; state.heights[c]++; state.moves++; history.push(c);
+    const line = fourLine(state.cells, r, c, p);
+    if (line) { gameOver = p; winCells = line; }
+    else if (state.moves === 42) { gameOver = 3; }
+  }
+  function aiSideValue(m) { // m.value is from side-to-move's view
+    return toMove(state) === humanPlayer ? -m.value : m.value;
+  }
+  function endMessage() {
+    if (gameOver === 3) return setStatus("Game over", "Draw. The board is full.");
+    if (gameOver === humanPlayer) setStatus("Game over", "You won. That is rare, so the network clearly missed something here.");
+    else setStatus("Game over", "The AI connected four.");
+    confidence[history.length] = gameOver === humanPlayer ? -1 : 1;
+    setMeter(confidence[history.length]);
+  }
+  async function analyseHumanTurn() {
+    busy = true; render(false);
+    const m = await ask(350, 4000, (u) => setStrip(u), 8000000);
+    busy = false;
+    const v = aiSideValue(m);
+    confidence[history.length] = v; setMeter(v); setStrip(m);
+    describeOutlook(v, true, m.proof !== undefined);
+    render(false);
+  }
+  function describeOutlook(v, yourTurn, proven) {
+    const pct = Math.round(50 * (v + 1));
+    let text;
+    if (proven) text = v > 0 ? "Proven: the AI wins from here with perfect play." : v < 0 ? "Proven: you can force a win from here. Can you find it?" : "Proven: perfect play from here ends in a draw.";
+    else if (v > 0.9) text = "The AI believes this is won for it.";
+    else if (v > 0.35) text = `The AI likes its position (${pct}%).`;
+    else if (v > -0.35) text = "Balanced. The AI sees a likely draw.";
+    else if (v > -0.9) text = `The AI thinks you are ahead (${100 - pct}% for you).`;
+    else text = "The AI thinks you have a winning position.";
+    setStatus(yourTurn ? "Your move" : "AI to move", text);
+  }
+  async function aiMove() {
+    busy = true; render(false);
+    setStatus("AI is thinking", "Searching…");
+    const timeMs = +$("strength").value;
+    const bar = $("thinkBar"); $("think").hidden = false;
+    const m = await ask(timeMs, 200000, (u) => { setStrip(u); bar.style.width = Math.min(100, 100 * u.ms / timeMs) + "%"; }, 40000000);
+    bar.style.width = "0"; $("think").hidden = true;
+    const v = m.value; // AI is side to move
+    applyMove(m.move);
+    confidence[history.length] = v; setMeter(v);
+    busy = false; setStrip(null);
+    render(true);
+    if (gameOver) return endMessage();
+    await analyseHumanTurn();
+  }
+  async function humanMove(c) {
+    if (!ready || busy || gameOver || toMove(state) !== humanPlayer || state.heights[c] >= H) return;
+    applyMove(c); setStrip(null); render(true);
+    if (gameOver) return endMessage();
+    await aiMove();
+  }
+  function newGame(human) {
+    thinkId++; pending = null;
+    state = newState(); history = []; humanPlayer = human; confidence = [null]; gameOver = 0; winCells = null; busy = false;
+    setMeter(null); setStrip(null); render(false);
+    if (human === 1) { analyseHumanTurn(); } else { aiMove(); }
+  }
+  function undo() {
+    if (busy || !history.length) return;
+    const moves = history.slice();
+    // remove back to the human's previous turn
+    do { moves.pop(); } while (moves.length && ((moves.length & 1) ? 2 : 1) !== humanPlayer);
+    state = newState(); history = []; gameOver = 0; winCells = null;
+    for (const c of moves) applyMove(c);
+    confidence = confidence.slice(0, moves.length + 1);
+    if (((moves.length & 1) ? 2 : 1) !== humanPlayer) { render(false); aiMove(); return; }
+    setStrip(null); render(false); analyseHumanTurn();
+  }
+  async function hint() {
+    if (busy || gameOver || toMove(state) !== humanPlayer) return;
+    busy = true; render(false); setStatus("Hint", "Thinking about your best move…");
+    const m = await ask(+$("strength").value, 200000, (u) => setStrip(u), 40000000);
+    busy = false; setStrip(m); render(false);
+    setStatus("Hint", `The AI would play column ${m.move + 1} here.`);
+    boardEl.children[m.move].focus();
+  }
+  $("newYou").onclick = () => newGame(1);
+  $("newAi").onclick = () => newGame(2);
+  $("undo").onclick = undo;
+  $("hint").onclick = hint;
+  $("showStrip").onchange = (e) => { stripEl.hidden = !e.target.checked; };
+  state = newState(); history = []; confidence = [null]; humanPlayer = 1; gameOver = 0; busy = false;
+  render(false);
+  startWorker();
+})();
+</script>

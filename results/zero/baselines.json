@@ -1,0 +1,29 @@
+[
+  {
+    "baseline": "random",
+    "win": 50,
+    "draw": 0,
+    "loss": 0,
+    "theoretically_lost_starts": 23,
+    "losses_from_won_or_drawn_starts": 0,
+    "seconds": 144.8
+  },
+  {
+    "baseline": "uct-rollouts-2000",
+    "win": 18,
+    "draw": 0,
+    "loss": 2,
+    "theoretically_lost_starts": 9,
+    "losses_from_won_or_drawn_starts": 2,
+    "seconds": 191.0
+  },
+  {
+    "baseline": "tactical",
+    "win": 50,
+    "draw": 0,
+    "loss": 0,
+    "theoretically_lost_starts": 19,
+    "losses_from_won_or_drawn_starts": 0,
+    "seconds": 243.6
+  }
+]

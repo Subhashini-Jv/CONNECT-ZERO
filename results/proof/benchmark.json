@@ -1,0 +1,83 @@
+{
+  "checkpoint": "models/best.pt",
+  "sims": 800,
+  "mode": "zero+proof",
+  "testset_random_play": {
+    "positions": 1000,
+    "policy_acc": 0.796,
+    "value_acc": 0.583,
+    "search_acc_50": 0.954,
+    "search_acc_200": 0.956,
+    "search_acc_800": 0.964
+  },
+  "testset_strong_play": {
+    "positions": 442,
+    "policy_acc": 0.9592760180995475,
+    "value_acc": 0.9004524886877828,
+    "search_acc_50": 0.9751131221719457,
+    "search_acc_200": 0.9796380090497737,
+    "search_acc_800": 0.9819004524886877
+  },
+  "vs_solver": {
+    "games": 69,
+    "held_theoretical_result": 69,
+    "agent_moves": 1147,
+    "optimal_moves": 1147,
+    "by_group": {
+      "agent_first_empty_board": {
+        "games": 6,
+        "held": 6,
+        "wins": 6,
+        "draws": 0,
+        "losses": 0,
+        "theory_wins": 6,
+        "theory_draws": 0,
+        "theory_losses": 0
+      },
+      "agent_second_each_opening": {
+        "games": 14,
+        "held": 14,
+        "wins": 8,
+        "draws": 4,
+        "losses": 2,
+        "theory_wins": 8,
+        "theory_draws": 4,
+        "theory_losses": 2
+      },
+      "all_49_two_ply_openings": {
+        "games": 49,
+        "held": 49,
+        "wins": 27,
+        "draws": 12,
+        "losses": 10,
+        "theory_wins": 27,
+        "theory_draws": 12,
+        "theory_losses": 10
+      }
+    },
+    "dropped": []
+  },
+  "vs_baselines": [
+    {
+      "baseline": "random",
+      "win": 50,
+      "draw": 0,
+      "loss": 0,
+      "seconds": 371.7
+    },
+    {
+      "baseline": "uct-rollouts-2000",
+      "win": 19,
+      "draw": 0,
+      "loss": 1,
+      "seconds": 297.7
+    },
+    {
+      "baseline": "tactical",
+      "win": 50,
+      "draw": 0,
+      "loss": 0,
+      "seconds": 542.6
+    }
+  ]
+}

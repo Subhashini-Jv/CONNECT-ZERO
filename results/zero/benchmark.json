@@ -1,0 +1,181 @@
+{
+  "checkpoint": "models/best.pt",
+  "sims": 800,
+  "mode": "zero",
+  "testset_random_play": {
+    "positions": 1000,
+    "policy_acc": 0.796,
+    "value_acc": 0.583,
+    "search_acc_50": 0.954,
+    "search_acc_200": 0.956,
+    "search_acc_800": 0.964
+  },
+  "testset_strong_play": {
+    "positions": 442,
+    "policy_acc": 0.9592760180995475,
+    "value_acc": 0.9004524886877828,
+    "search_acc_50": 0.9751131221719457,
+    "search_acc_200": 0.9796380090497737,
+    "search_acc_800": 0.9819004524886877
+  },
+  "vs_solver": {
+    "games": 69,
+    "held_theoretical_result": 52,
+    "agent_moves": 1154,
+    "optimal_moves": 1132,
+    "by_group": {
+      "agent_first_empty_board": {
+        "games": 6,
+        "held": 6,
+        "wins": 6,
+        "draws": 0,
+        "losses": 0,
+        "theory_wins": 6,
+        "theory_draws": 0,
+        "theory_losses": 0
+      },
+      "agent_second_each_opening": {
+        "games": 14,
+        "held": 8,
+        "wins": 3,
+        "draws": 5,
+        "losses": 6,
+        "theory_wins": 8,
+        "theory_draws": 4,
+        "theory_losses": 2
+      },
+      "all_49_two_ply_openings": {
+        "games": 49,
+        "held": 38,
+        "wins": 21,
+        "draws": 9,
+        "losses": 19,
+        "theory_wins": 27,
+        "theory_draws": 12,
+        "theory_losses": 10
+      }
+    },
+    "dropped": [
+      {
+        "opening": "2",
+        "side": 2,
+        "moves": "225355352225523334431114444111776667777666",
+        "theory": 1,
+        "result": 0
+      },
+      {
+        "opening": "2",
+        "side": 2,
+        "moves": "225355352225523334431114444166677777117666",
+        "theory": 1,
+        "result": 0
+      },
+      {
+        "opening": "1",
+        "side": 2,
+        "moves": "142656444662344777771322117623336321155",
+        "theory": 1,
+        "result": -1
+      },
+      {
+        "opening": "5",
+        "side": 2,
+        "moves": "545544425452422315277211117717733",
+        "theory": 0,
+        "result": -1
+      },
+      {
+        "opening": "6",
+        "side": 2,
+        "moves": "66366533536554576531771177113712244",
+        "theory": 1,
+        "result": -1
+      },
+      {
+        "opening": "6",
+        "side": 2,
+        "moves": "663665331444136467371137774471122",
+        "theory": 1,
+        "result": -1
+      },
+      {
+        "opening": "11",
+        "side": 1,
+        "moves": "114744434143377677227666662222311331555555",
+        "theory": 1,
+        "result": 0
+      },
+      {
+        "opening": "22",
+        "side": 1,
+        "moves": "225755224335563433423462",
+        "theory": 0,
+        "result": -1
+      },
+      {
+        "opening": "24",
+        "side": 1,
+        "moves": "244442224762432377333377711661166611",
+        "theory": 0,
+        "result": -1
+      },
+      {
+        "opening": "32",
+        "side": 1,
+        "moves": "322223335666636553677111177575172251444444",
+        "theory": 1,
+        "result": -1
+      },
+      {
+        "opening": "31",
+        "side": 1,
+        "moves": "313334444341171754355555622622666777722116",
+        "theory": 1,
+        "result": 0
+      },
+      {
+        "opening": "34",
+        "side": 1,
+        "moves": "3433444224242211327777771111666666555533",
+        "theory": 0,
+        "result": -1
+      },
+      {
+        "opening": "53",
+        "side": 1,
+        "moves": "535535544444541337777111112222666667762233",
+        "theory": 0,
+        "result": -1
+      },
+      {
+        "opening": "54",
+        "side": 1,
+        "moves": "545544412424333377773377226221555661166611",
+        "theory": 0,
+        "result": -1
+      },
+      {
+        "opening": "56",
+        "side": 1,
+        "moves": "566665553222252523377111136631377177444444",
+        "theory": 1,
+        "result": -1
+      },
+      {
+        "opening": "57",
+        "side": 1,
+        "moves": "575554445577731331331447127234112222",
+        "theory": 1,
+        "result": -1
+      },
+      {
+        "opening": "67",
+        "side": 1,
+        "moves": "6737456775552122442513332353121117744466",
+        "theory": 1,
+        "result": -1
+      }
+    ]
+  },
+  "vs_baselines": []
+}

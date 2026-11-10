@@ -1,0 +1,4 @@
+__pycache__/
+*.so
+runs/*/gen*.pt
+data/*.tmp
