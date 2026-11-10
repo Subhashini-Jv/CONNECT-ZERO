@@ -104,15 +104,3 @@ The proof book is built by walking every line an opponent can play for the first
 ### Benchmarks (`c4/benchmark.py`, `c4/evaluate.py`)
 * **Move accuracy**: the share of positions where the chosen move keeps the game-theoretic result. Two sets are used: 1,000 positions from random games (like classic solver test suites) and 442 positions from late self-play games (closer to real play). Only "decision" positions are kept, where at least one legal move would change the result.
 * **Games against a perfect solver.** The solver always keeps its best result. Among equal moves it prefers the fastest win or the slowest loss. Games: the agent moves first from the empty board (6 games, theory: win), the agent moves second after each of the 7 possible first moves (14 games), and the agent moves first from every one of the 49 two-move openings. A game counts as **held** if the agent gets the game-theoretic result of its starting position. Against perfect play it can never do better.
-
-## Project layout
-
-```
-c4/            engine, solver, network, MCTS, self-play, training, benchmarks, plots, CLI
-web/           browser game (index.html + exported model.js / proof.js)
-models/        trained network (best.pt)
-data/          test sets, solver cache, proof book
-runs/main/     training log, per-generation metrics and self-play games
-results/       benchmark reports and solver games
-docs/img/      charts
-```
